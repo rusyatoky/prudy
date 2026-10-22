@@ -27,7 +27,7 @@ h1 span{color:var(--lamp)}
 .iconbtn:focus-visible,.pad button:focus-visible,.big:focus-visible,input:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
 .hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-family:var(--px)}
 .hud div{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;min-width:0}
-.hud small{display:block;font-size:8px;letter-spacing:.06em;margin-bottom:6px;color:var(--dim);text-transform:uppercase}
+.hud small{display:block;font-size:7px;letter-spacing:0;white-space:nowrap;margin-bottom:7px;color:var(--dim);text-transform:uppercase}
 .hud b{font-size:14px;font-weight:400;white-space:nowrap;font-variant-numeric:tabular-nums}
 .screen{position:relative;border:2px solid var(--line);border-radius:8px;overflow:hidden;background:#000;line-height:0;margin:0 auto;max-width:100%}
 canvas#game{display:block;touch-action:none;-webkit-user-select:none;user-select:none}
@@ -60,7 +60,6 @@ ol.top li span:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:n
 ol.top li.empty{display:block;color:var(--dim);font-family:var(--body);font-size:13px}
 .topnote{font-size:12px;color:var(--dim);margin-top:6px}
 .cols{display:grid;grid-template-columns:1fr;gap:14px}
-@media (min-width:760px){.cols{grid-template-columns:1fr 1fr}}
 @media (prefers-reduced-motion:reduce){.big:active{transform:none}}
 </style>
 
@@ -75,7 +74,7 @@ ol.top li.empty{display:block;color:var(--dim);font-family:var(--body);font-size
 
   <div class="hud">
     <div><small>Очки</small><b id="score">0</b></div>
-    <div><small>Рекорд</small><b id="best">0</b></div>
+    <div><small>Твой рекорд</small><b id="best">0</b></div>
     <div><small>Жизни·ур</small><b id="lives">♥♥♥ ·1</b></div>
   </div>
 
@@ -90,9 +89,8 @@ ol.top li.empty{display:block;color:var(--dim);font-family:var(--body);font-size
     <div class="overlay" id="overScreen" hidden>
       <h2 id="overTitle">Поймали!</h2>
       <p id="overText">Очки: 0</p>
-      <input id="nick" maxlength="14" placeholder="Твой ник" autocomplete="off">
-      <button class="big" id="saveBtn">В топ и заново</button>
-      <p class="note" id="saveNote"></p>
+      <p class="note" id="bestText"></p>
+      <button class="big" id="saveBtn">Ещё раз</button>
     </div>
   </div>
 
@@ -109,11 +107,6 @@ ol.top li.empty{display:block;color:var(--dim);font-family:var(--body);font-size
     <section>
       <h3>КТО ГОНИТСЯ</h3>
       <div class="crew" id="crew"></div>
-    </section>
-    <section>
-      <h3>ТОП РАЙОНА</h3>
-      <ol class="top" id="top"><li class="empty">Загружаем рекорды…</li></ol>
-      <div class="topnote" id="topNote"></div>
     </section>
   </div>
 </div>
@@ -160,8 +153,7 @@ let T = 20, DPR = 1, viewW = 0, viewH = 0, camX = 0;
 let dots, dotsLeft, score = 0, lives = 3, level = 1, best = 0;
 let state = "idle", stateT = 0, modeT = 0, frightT = 0, ghostCombo = 0, t = 0;
 let player, ghosts, bubble = null, bubbleCD = 2, popups = [];
-let held = null, joy = null, swiped = false;
-try { swiped = localStorage.getItem("prudy-swiped")==="1"; } catch(e) {}
+let held = null, joy = null, swiped = false;   /* подсказка «веди пальцем» — в каждой новой игре, пока не проведёшь */
 const DIRS = {up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
 try { best = +localStorage.getItem("prudy-best") || 0; } catch(e) {}
 document.getElementById("best").textContent = best;
@@ -860,7 +852,7 @@ function render(){
 
 /* ================= старт / конец ================= */
 function newGame(){
-  score = 0; lives = 3; level = 1; addScore(0); updateLives();
+  score = 0; lives = 3; level = 1; addScore(0); updateLives(); swiped = false;
   resetDots(); resetActors(); state = "ready"; stateT = 0;
   camX = clampCam((player.x+0.5)*T - viewW/2);
   document.getElementById("startScreen").hidden = true;
@@ -870,26 +862,19 @@ function newGame(){
 function gameOver(){
   state = "over"; held = null;
   document.getElementById("overText").textContent = "Очки: " + score + " · уровень " + level;
-  document.getElementById("saveNote").textContent = "";
-  const n = document.getElementById("nick");
-  try { n.value = localStorage.getItem("prudy-nick") || ""; } catch(e) {}
+  document.getElementById("bestText").textContent = score >= best && score > 0 ? "Это твой новый рекорд!" : "Твой рекорд: " + best;
   document.getElementById("overScreen").hidden = false;
 }
 document.getElementById("startBtn").addEventListener("click", () => { sfx.init(); newGame(); });
-document.getElementById("saveBtn").addEventListener("click", async () => {
-  const nick = (document.getElementById("nick").value || "").trim().slice(0,14) || "Аноним";
-  try { localStorage.setItem("prudy-nick", nick); } catch(e) {}
-  await saveScore(nick, score);
-  newGame();
-});
+document.getElementById("saveBtn").addEventListener("click", () => newGame());
 
 /* ================= управление: идёшь, пока держишь ================= */
 const KEYS = {arrowup:"up",arrowdown:"down",arrowleft:"left",arrowright:"right",w:"up",s:"down",a:"left",d:"right",ц:"up",ы:"down",ф:"left",в:"right"};
 const keyStack = [];
 addEventListener("keydown", e => {
-  if (e.target.tagName==="INPUT"){ if (e.key==="Enter") document.getElementById("saveBtn").click(); return; }
+  if ((e.key===" "||e.key==="Enter") && state==="over"){ e.preventDefault(); document.getElementById("saveBtn").click(); return; }
   const k = KEYS[e.key.toLowerCase()];
-  if (k){ e.preventDefault(); if (!keyStack.includes(k)) keyStack.push(k); held = k; }
+  if (k){ e.preventDefault(); if (!keyStack.includes(k)) keyStack.push(k); held = k; swiped = true; }
   if ((e.key===" "||e.key==="Enter") && state==="idle"){ e.preventDefault(); document.getElementById("startBtn").click(); }
 });
 addEventListener("keyup", e => {
@@ -911,7 +896,7 @@ cv.addEventListener("pointermove", e => {
   const dx = joy.x-joy.ox, dy = joy.y-joy.oy;
   if (Math.hypot(dx,dy) > 12){
     held = Math.abs(dx)>Math.abs(dy) ? (dx>0?"right":"left") : (dy>0?"down":"up");
-    if (!swiped){ swiped = true; try { localStorage.setItem("prudy-swiped","1"); } catch(e) {} }
+    swiped = true;
   }
   /* центр джойстика тянется за пальцем, чтобы повороты были быстрыми */
   const d = Math.hypot(dx,dy);
@@ -932,7 +917,10 @@ document.querySelectorAll(".pad button").forEach(b => {
   b.addEventListener("pointerup", off); b.addEventListener("pointercancel", off); b.addEventListener("lostpointercapture", off);
   b.addEventListener("contextmenu", e => e.preventDefault());
 });
-document.addEventListener("visibilitychange", () => { if (document.hidden){ sfx.music(false); held = null; } else if (musicOn) sfx.music(true); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden){ sfx.music(false); held = null; }
+  else { try { window.__keepAlive && window.__keepAlive.play().catch(()=>{}); } catch(e) {} if (musicOn) sfx.music(true); }
+});
 
 /* ================= 8-бит: бодрая своя мелодия ================= */
 let musicOn = true;
@@ -986,7 +974,16 @@ const sfx = (() => {
   }
   return {
     init(){
-      if (ac) return;
+      /* айфон: звук и при выключенном звонке (переключатель сбоку) — как у видео, только по громкости */
+      try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch(e) {}
+      try {
+        if (!window.__keepAlive){
+          const el = new Audio("data:audio/wav;base64,UklGRsQPAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YaAPAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA");
+          el.loop = true; el.setAttribute("playsinline",""); el.setAttribute("x-webkit-airplay","deny");
+          el.play().catch(() => {}); window.__keepAlive = el;
+        }
+      } catch(e) {}
+      if (ac){ if (ac.state==="suspended") ac.resume(); return; }
       try {
         ac = new (window.AudioContext||window.webkitAudioContext)();
         master = ac.createGain(); master.gain.value = 0.7; master.connect(ac.destination);
@@ -1056,51 +1053,6 @@ muteBtn.addEventListener("click", () => {
   musicOn = !musicOn; sfx.init(); sfx.music(musicOn);
   muteBtn.textContent = musicOn ? "♪ Музыка" : "♪ Выкл"; muteBtn.setAttribute("aria-pressed", String(!musicOn));
 });
-
-/* ================= общий топ ================= */
-let db = null, me = null, rows = [];
-function renderTop(){
-  const ol = document.getElementById("top"); ol.innerHTML = "";
-  if (!rows.length){ const li = document.createElement("li"); li.className="empty"; li.textContent = "Пока пусто. Сыграй первым."; ol.append(li); return; }
-  rows.slice(0,10).forEach((r,i) => {
-    const li = document.createElement("li"); if (r.id===me) li.className = "me";
-    const a = document.createElement("span"); a.textContent = (i+1)+".";
-    const b = document.createElement("span"); b.textContent = r.name;
-    const c = document.createElement("span"); c.textContent = r.score;
-    li.append(a,b,c); ol.append(li);
-  });
-}
-function localTop(){ try { return JSON.parse(localStorage.getItem("prudy-top")||"[]"); } catch(e){ return []; } }
-async function saveScore(name, sc){
-  const note = document.getElementById("saveNote");
-  if (db && me){
-    try {
-      const ref = db.doc("scores/"+me), cur = await ref.get();
-      const prev = cur.data();
-      await ref.set(sc > (prev?.score||0) ? {name, score: sc, ts: Date.now()} : {name, score: prev.score, ts: prev.ts || Date.now()});
-      return;
-    } catch(e){ note.textContent = "Не вышло сохранить в общий топ"; }
-  }
-  const lt = localTop(); lt.push({id:"local-"+Date.now(), name, score: sc});
-  lt.sort((a,b)=>b.score-a.score); lt.length = Math.min(lt.length,10);
-  try { localStorage.setItem("prudy-top", JSON.stringify(lt)); } catch(e) {}
-  rows = lt; renderTop();
-}
-(async () => {
-  rows = localTop(); renderTop();
-  const note = document.getElementById("topNote");
-  if (!window.claude?.use){ note.textContent = "Рекорды сохраняются на этом телефоне."; return; }
-  try {
-    const [d, u] = await Promise.all([claude.use("db"), claude.use("user")]);
-    if (u) me = await u.id();
-    if (!d){ note.textContent = "Общий топ видят те, кто вошёл в Claude. Твои рекорды сохраняются на этом телефоне."; return; }
-    db = d;
-    db.collection("scores").orderBy("score","desc").limit(10).onSnapshot(snap => {
-      rows = snap.docs.map(x => ({id:x.id, ...(x.data()||{})})).filter(r => typeof r.score==="number");
-      renderTop();
-    }, () => { note.textContent = "Топ временно не грузится."; });
-  } catch(e){ note.textContent = "Рекорды сохраняются на этом телефоне."; }
-})();
 
 /* ================= запуск ================= */
 drawCrew();
