@@ -260,23 +260,19 @@ function drawWall(b,x,y,ch){
     return;
   }
   if (ch==="p"){
-    /* детская площадка с качелями и горкой */
+    /* детская площадка: песок и синие качели буквой А (сиденья качаются в render) */
     if (tile(x-1,y)==="p" || tile(x,y-1)==="p") return;
     let w = 0, h = 0; while (tile(x+w,y)==="p") w++; while (tile(x,y+h)==="p") h++;
-    const PW = w*T, PH = h*T;
-    px(b,X,Y,PW,PH,"#2f7a46"); px(b,X+u,Y+u,PW-2*u,PH-2*u,"#c2573e");
-    for (let i=0;i<6;i++) px(b,X+u*2+rnd(x,i,1)*(PW-5*u),Y+u*2+rnd(i,y,2)*(PH-5*u),u*1.2,u*1.2,"#d97a5c");
-    /* качели: две стойки, перекладина, два сиденья на цепях */
-    const sx = X+u*2.5, sw = PW*0.55, top = Y+u*3;
-    px(b,sx,top,u*1.2,PH*0.62,"#3b6fd6"); px(b,sx+sw,top,u*1.2,PH*0.62,"#3b6fd6");
-    px(b,sx,top,sw+u*1.2,u*1.2,"#5b8ff0");
-    for (const k of [0.3,0.7]){ const cx = sx+sw*k; px(b,cx,top+u,u*0.5,PH*0.32,"#c9cdd9"); px(b,cx+u*1.6,top+u,u*0.5,PH*0.32,"#c9cdd9"); px(b,cx-u*0.4,top+u+PH*0.32,u*2.8,u*0.9,"#ffd166"); }
-    /* горка */
-    const gx = X+PW*0.7, gy = Y+PH*0.45;
-    px(b,gx,gy,u*1.2,PH*0.42,"#e6e9f2");
-    b.fillStyle = "#ffcf3a"; b.beginPath(); b.moveTo(gx+u*1.2,gy); b.lineTo(X+PW-u*1.5,Y+PH-u*2.5); b.lineTo(X+PW-u*3,Y+PH-u*2.5); b.lineTo(gx+u*1.2,gy+u*2); b.fill();
-    /* песочница */
-    px(b,X+u*2.5,Y+PH*0.72,PW*0.38,PH*0.18,"#7a4b2a"); px(b,X+u*3.3,Y+PH*0.72+u*0.8,PW*0.38-u*1.6,PH*0.18-u*1.6,"#e8cf8f");
+    const PW = w*T, PH = h*T, q = PW/20;
+    px(b,X,Y,PW,PH,"#2f7a46");
+    for (let i=0;i<8;i++) px(b,X+rnd(x,i,3)*PW*0.9,Y+rnd(i,y,4)*PH*0.25,q,q*1.4,"#4f9c58");
+    px(b,X+q,Y+q*11,q*18,q*8,"#e3cb92"); px(b,X+q,Y+q*11,q*18,q*0.8,"#c9ac6e");
+    for (let i=0;i<6;i++) px(b,X+q*2+rnd(x,i,5)*q*15,Y+q*12+rnd(i,y,6)*q*6,q*0.8,q*0.8,"#cdb176");
+    b.save(); b.lineCap = "square"; b.lineWidth = q*1.5; b.strokeStyle = "#2d5fc4";
+    for (const [x1,x2] of [[4,1.5],[4,6.5],[16,13.5],[16,18.5]]){ b.beginPath(); b.moveTo(X+x1*q,Y+q*3); b.lineTo(X+x2*q,Y+q*17.5); b.stroke(); }
+    b.restore();
+    px(b,X+q*2,Y+q*2.2,q*16,q*1.8,"#4f86ee"); px(b,X+q*2,Y+q*3.4,q*16,q*0.6,"#2848a8");
+    for (const fx of [0.8,5.8,12.8,17.8]) px(b,X+fx*q,Y+q*17.3,q*1.6,q*0.9,"#1f3a86");
     return;
   }
   if (ch==="S"){
@@ -508,6 +504,8 @@ function resize(){
   drawBackground();
   camX = clampCam(player ? (player.x+0.5)*T - viewW/2 : (START.x+0.5)*T - viewW/2);
 }
+/* где стоит детская площадка */
+const PG = (() => { for (let y=0;y<H;y++){ const x = MAZE[y].indexOf("p"); if (x>=0){ let w=0; while (MAZE[y][x+w]==="p") w++; return {x, y, w}; } } return null; })();
 const clampCam = v => Math.max(0, Math.min(W*T - viewW, v));
 
 /* ================= уровень ================= */
@@ -746,6 +744,20 @@ function render(){
       if (d===1) ctx.fillRect(Math.round((x+0.5)*T-ds/2), Math.round((y+0.5)*T-ds/2), ds, ds);
       else if (d===2) drawShawarma(x,y);
     }
+  }
+  if (PG){
+    const q = PG.w*T/20, X = PG.x*T, Y = PG.y*T;
+    [7.3, 12.7].forEach((px0,k) => {
+      const ang = Math.sin(t*2.3 + k*1.7)*0.5, L = q*8.5;
+      const ox = X+px0*q, oy = Y+q*3.6, sx = ox + Math.sin(ang)*L, sy = oy + Math.cos(ang)*L;
+      ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.beginPath(); ctx.ellipse(sx, Y+q*16.2, q*1.8, q*0.5, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = "#d5d8e2"; ctx.lineWidth = Math.max(1,q*0.45);
+      ctx.beginPath(); ctx.moveTo(ox-q*1.3,oy); ctx.lineTo(sx-q*1.5,sy); ctx.moveTo(ox+q*1.3,oy); ctx.lineTo(sx+q*1.5,sy); ctx.stroke();
+      ctx.save(); ctx.translate(sx,sy); ctx.rotate(-ang*0.6);
+      ctx.fillStyle = k ? "#ff6b4a" : "#ffd166"; ctx.fillRect(-q*1.9,-q*0.4,q*3.8,q*1.1);
+      ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.fillRect(-q*1.9,q*0.4,q*3.8,q*0.3);
+      ctx.restore();
+    });
   }
   if (BUS.complete && BUS.naturalWidth){
     const bw = T*5.2, bh = bw*55/120, bx = bus.x*T, by = 18.72*T - bh;
