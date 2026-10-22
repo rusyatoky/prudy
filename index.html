@@ -1004,7 +1004,7 @@ const sfx = (() => {
         });
       } catch(e){ ac = null; }
       /* своя музыка: если рядом с index.html лежит music.mp3 — играет она вместо 8-бит */
-      if (ac) fetch("music.mp3").then(r => r.ok ? r.arrayBuffer() : Promise.reject())
+      if (ac) fetch("music.mp3?v=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? r.arrayBuffer() : Promise.reject())
         .then(b => ac.decodeAudioData(b)).then(bu => { track = bu; if (musicOn) this.music(true); }).catch(() => {});
       if (musicOn) this.music(true);
     },
