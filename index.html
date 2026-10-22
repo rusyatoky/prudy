@@ -60,6 +60,18 @@ ol.top li span:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:n
 ol.top li.empty{display:block;color:var(--dim);font-family:var(--body);font-size:13px}
 .topnote{font-size:12px;color:var(--dim);margin-top:6px}
 .cols{display:grid;grid-template-columns:1fr;gap:14px}
+.fans{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.fanshead{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.fanstext{margin:0;font-size:13px;color:var(--dim);line-height:1.45;max-width:46ch}
+.fanscount{font-family:var(--px);font-weight:400;font-size:18px;color:var(--lamp);white-space:nowrap}
+.fanscount::after{content:" на траве";font-size:8px;color:var(--dim);display:block;margin-top:6px}
+.fans .big{align-self:center}
+.editor{display:flex;flex-direction:column;gap:10px;align-items:center}
+#grid{width:min(320px,100%);height:auto;aspect-ratio:1;touch-action:none;image-rendering:pixelated;border:2px solid var(--line);border-radius:6px;background:#2a6338}
+.pal{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.pal button{width:34px;height:34px;border-radius:6px;border:2px solid var(--line);cursor:pointer;padding:0}
+.pal button[aria-pressed="true"]{border-color:var(--lamp);box-shadow:0 0 0 2px var(--lamp)}
+.edrow{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 @media (prefers-reduced-motion:reduce){.big:active{transform:none}}
 </style>
 
@@ -102,6 +114,28 @@ ol.top li.empty{display:block;color:var(--dim);font-family:var(--body);font-size
     <button class="right" data-d="right" aria-label="Вправо"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><polygon points="19,12 6,4 6,20" fill="currentColor"/></svg></button>
   </div>
   <p class="hint">Удобнее всего водить пальцем прямо по карте. На компьютере — стрелки или WASD</p>
+
+  <section class="fans" id="fans">
+    <div class="fanshead">
+      <div>
+        <h3>ЗРИТЕЛИ</h3>
+        <p class="fanstext">Человечки на траве у дороги — их рисуют игроки. Нарисуй своего: он встанет к остальным и будет болеть за всех, кто играет. Анонимно и сколько угодно раз.</p>
+      </div>
+      <b class="fanscount" id="fansCount">0</b>
+    </div>
+    <button class="big" id="drawOpen">Нарисовать зрителя</button>
+    <div class="editor" id="editor" hidden>
+      <canvas id="grid" width="320" height="320" aria-label="Холст 16 на 16 клеток"></canvas>
+      <div class="pal" id="pal"></div>
+      <div class="edrow">
+        <button class="iconbtn" id="tplBtn">Шаблон</button>
+        <button class="iconbtn" id="clrBtn">Очистить</button>
+        <button class="iconbtn" id="cancelBtn">Отмена</button>
+      </div>
+      <button class="big" id="sendBtn">Поставить на траву</button>
+      <p class="note" id="fanNote"></p>
+    </div>
+  </section>
 
   <div class="cols">
     <section>
@@ -556,7 +590,7 @@ function playerCenter(p){
   if (d){
     dots[p.y][ix] = 0; dotsLeft--;
     if (d===1){ addScore(10); sfx.dot(); } else { addScore(50); startFright(); }
-    if (dotsLeft<=0){ state = "clear"; stateT = 0; sfx.clear(); p.dx = p.dy = 0; p.halt = true; return; }
+    if (dotsLeft<=0){ state = "clear"; stateT = 0; sfx.clear(); cheer(2.2); p.dx = p.dy = 0; p.halt = true; return; }
   }
   if (!held){ p.dx = 0; p.dy = 0; return; }
   const [hx,hy] = DIRS[held];
@@ -665,7 +699,7 @@ function frame(now){
       if (state!=="play") break;
       if (Math.hypot(g.x-player.x, g.y-player.y) < 0.65){
         if (g.mode==="scared"){
-          ghostCombo++; const pts = 200*Math.pow(2,ghostCombo-1); addScore(pts);
+          cheer(1.2); ghostCombo++; const pts = 200*Math.pow(2,ghostCombo-1); addScore(pts);
           popups.push({x:g.x,y:g.y,txt:"+"+pts,life:1}); g.mode="eaten"; sfx.eat();
           g.x = Math.round(g.x); g.y = Math.round(g.y);
         } else if (g.mode==="out"){
@@ -696,6 +730,7 @@ function frame(now){
     if (stateT>2.2){ level++; updateLives(); resetDots(); resetActors(); state="ready"; stateT=0; }
   }
   popups.forEach(p => p.life -= dt); popups = popups.filter(p => p.life>0);
+  stepFans(dt);
   if (state==="play"||state==="ready"||state==="idle"){
     vaz.x += dt*2.6; if (vaz.x > W+1) vaz.x = -4;
     vaz.honk -= dt;
@@ -761,6 +796,7 @@ function render(){
     ctx.fillStyle = "#16161c"; ctx.fillRect(bx+bw*0.06, by+bh*0.09, bw*0.2, fs*1.05);
     ctx.fillStyle = "#ffd21f"; ctx.fillText("770", bx+bw*0.16, by+bh*0.09+fs*0.55);
   }
+  drawFans(x0, x1);
   if (VAZ.complete && VAZ.naturalWidth){
     const vw = T*3, vh = vw*42/80, vx = vaz.x*T, vy = 19.15*T - vh;
     ctx.fillStyle = "rgba(0,0,0,.4)"; ctx.beginPath(); ctx.ellipse(vx+vw/2, 19.05*T, vw*0.46, T*0.12, 0, 0, 7); ctx.fill();
@@ -842,6 +878,13 @@ function render(){
     const dx = joy.x-joy.ox, dy = joy.y-joy.oy, d = Math.hypot(dx,dy) || 1, k = Math.min(1, 24/d);
     ctx.beginPath(); ctx.arc(joy.ox+dx*k, joy.oy+dy*k, 12, 0, 7); ctx.fill();
   }
+  if (state==="ready" && fans.length && introShows<=3){
+    const fs = Math.max(8, Math.round(T*0.4)), txt = "ЗРИТЕЛИ — ИХ РИСУЮТ ИГРОКИ ↓";
+    ctx.font = `${fs}px "Press Start 2P", monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const tw = ctx.measureText(txt).width + 12;
+    ctx.fillStyle = "rgba(6,10,22,.8)"; ctx.fillRect(viewW/2-tw/2, 14.55*T, tw, fs*2);
+    ctx.fillStyle = "#ffd166"; ctx.fillText(txt, viewW/2, 14.55*T + fs);
+  }
   if (state==="ready"){
     ctx.font = `${Math.round(T*0.85)}px "Press Start 2P", monospace`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -852,6 +895,8 @@ function render(){
 
 /* ================= старт / конец ================= */
 function newGame(){
+  setTimeout(() => cheer(1.8), 150);
+  introShows++; try { localStorage.setItem("prudy-fanintro", introShows); } catch(e) {}
   score = 0; lives = 3; level = 1; addScore(0); updateLives(); swiped = false;
   resetDots(); resetActors(); state = "ready"; stateT = 0;
   camX = clampCam((player.x+0.5)*T - viewW/2);
@@ -1032,6 +1077,16 @@ const sfx = (() => {
     power(){ if (!ac) return; tone(220,0.35,"square",0.08,null,700); tone(330,0.35,"triangle",0.1,ac.currentTime+0.05,500); },
     eat(){ if (!ac) return; tone(300,0.25,"square",0.09,null,1300); },
     die(){ if (!ac) return; for (let i=0;i<9;i++) tone(700-i*60,0.12,"square",0.08,ac.currentTime+i*0.1,-50); },
+    applause(level=1){
+      if (!ac) return;
+      const n0 = Math.round(14 + 26*level);
+      for (let i=0;i<n0;i++){
+        const w = ac.currentTime + Math.random()*1.3, s = ac.createBufferSource(); s.buffer = noise;
+        const f = ac.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 900 + Math.random()*1800; f.Q.value = 1.2;
+        const g = ac.createGain(); g.gain.setValueAtTime(0.0001, w); g.gain.exponentialRampToValueAtTime(0.18*level, w+0.004); g.gain.exponentialRampToValueAtTime(0.0008, w+0.06);
+        s.connect(f); f.connect(g); g.connect(master); s.start(w, Math.random()*0.4); s.stop(w+0.08);
+      }
+    },
     clear(){ if (!ac) return; [72,76,79,84,88].forEach((m,i)=>tone(n(m),0.15,"square",0.07,ac.currentTime+i*0.1)); },
     start(){ if (!ac) return; step = 0; nextT = ac.currentTime + 0.05; [72,76,79,84,79,84].forEach((m,i)=>tone(n(m),0.12,"square",0.06,ac.currentTime+i*0.1)); },
     music(on){
@@ -1053,6 +1108,123 @@ muteBtn.addEventListener("click", () => {
   musicOn = !musicOn; sfx.init(); sfx.music(musicOn);
   muteBtn.textContent = musicOn ? "♪ Музыка" : "♪ Выкл"; muteBtn.setAttribute("aria-pressed", String(!musicOn));
 });
+
+/* ================= зрители: рисуют игроки, стоят на траве ================= */
+const FANS_URL = "https://script.google.com/macros/s/AKfycbxWNhCt3jZQ9QqQZs6LEeWcvVVgA2QxZcrhXl9sDoFr97NCKZXGRryfxb-dtvX454OnqQ/exec";
+const FAN_PAL = [null,"#15171c","#f2f3f5","#e23b3b","#ff9a3c","#ffd166","#4fbf5a","#3b6fd6","#b065e0","#f1c19a"];
+let fans = [], cheerT = 0, flashes = [];
+const LAWN = (() => { const xs = []; for (let x=0;x<W;x++) if (MAZE[15][x]==="w" && MAZE[16][x]==="w" && MAZE[17][x]==="w") xs.push(x); return xs; })();
+function hashStr(s){ let h = 2166136261; for (let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } h ^= h>>>16; h = Math.imul(h, 0x85ebca6b); h ^= h>>>13; h = Math.imul(h, 0xc2b2ae35); h ^= h>>>16; return (h>>>0)/4294967296; }
+function fanSprite(px){
+  const c = document.createElement("canvas"); c.width = c.height = 16; const x = c.getContext("2d");
+  for (let i=0;i<256;i++){ const k = +px[i]; if (k){ x.fillStyle = FAN_PAL[k]; x.fillRect(i%16, Math.floor(i/16), 1, 1); } }
+  return c;
+}
+function addFan(f){
+  if (fans.some(o => o.id===f.id)) return;
+  const r = hashStr(f.id), r2 = hashStr(f.id+"y");
+  const lx = LAWN[Math.floor(r*LAWN.length)] ?? 2;
+  fans.push({id:f.id, img:fanSprite(f.px), x:lx + r2*0.8, y:15.95 + hashStr(f.id+"z")*1.35, vx:(r2-0.5)*0.6, ph:r*6.28});
+}
+function setFans(list){
+  list.forEach(addFan);
+  fans.sort((a,b) => a.y-b.y);
+  document.getElementById("fansCount").textContent = fans.length;
+}
+function localFans(){ try { return JSON.parse(localStorage.getItem("prudy-fans")||"[]"); } catch(e){ return []; } }
+async function loadFans(){
+  if (!FANS_URL){ setFans(localFans()); return; }
+  try { const r = await fetch(FANS_URL + "?t=" + Date.now(), {cache:"no-store"}); const l = await r.json(); if (Array.isArray(l)) setFans(l.filter(f => /^[0-9]{256}$/.test(f.px))); } catch(e) {}
+}
+function cheer(sec=1.6){ cheerT = Math.max(cheerT, sec); if (fans.length) sfx.applause(Math.min(1, 0.3 + fans.length*0.05)); }
+function stepFans(dt){
+  if (cheerT>0) cheerT -= dt;
+  fans.forEach(f => {
+    f.x += f.vx*dt*(cheerT>0 ? 0 : 1);
+    const tx = Math.floor(f.x);
+    if (!LAWN.includes(tx) || !LAWN.includes(Math.floor(f.x+0.9))){ f.vx = -f.vx; f.x += f.vx*dt*2; }
+    if (Math.random() < dt*0.15) f.vx = (Math.random()-0.5)*0.6;
+  });
+  if (cheerT>0 && fans.length && Math.random() < dt*10){ const f = fans[Math.floor(Math.random()*fans.length)]; flashes.push({x:f.x+0.5, y:f.y-0.2, life:0.25}); }
+  flashes.forEach(f => f.life -= dt); flashes = flashes.filter(f => f.life>0);
+}
+function drawFans(x0, x1){
+  const sz = T*1.15;
+  ctx.imageSmoothingEnabled = false;
+  fans.forEach(f => {
+    if (f.x < x0-2 || f.x > x1+2) return;
+    const jump = cheerT>0 ? Math.abs(Math.sin(t*12 + f.ph))*T*0.45 : Math.abs(Math.sin(t*3 + f.ph))*T*0.06;
+    const cx = (f.x+0.5)*T, by = (f.y+0.55)*T;
+    ctx.fillStyle = "rgba(0,0,0,.3)"; ctx.beginPath(); ctx.ellipse(cx, by, sz*0.3, sz*0.08, 0, 0, 7); ctx.fill();
+    ctx.save(); ctx.translate(cx, by - sz - jump);
+    if (f.vx < 0 && cheerT<=0){ ctx.scale(-1,1); }
+    ctx.drawImage(f.img, -sz/2, 0, sz, sz); ctx.restore();
+  });
+  flashes.forEach(f => {
+    const a = f.life/0.25, r = T*0.9*(1-a*0.5);
+    ctx.fillStyle = `rgba(255,255,240,${a*0.9})`;
+    ctx.beginPath(); ctx.arc(f.x*T, f.y*T, r*0.35, 0, 7); ctx.fill();
+    ctx.fillRect(f.x*T - r, f.y*T - 1, r*2, 2); ctx.fillRect(f.x*T - 1, f.y*T - r, 2, r*2);
+  });
+}
+let introShows = 0; try { introShows = +localStorage.getItem("prudy-fanintro") || 0; } catch(e) {}
+
+/* редактор 16×16 */
+(() => {
+  const grid = document.getElementById("grid"), g = grid.getContext("2d");
+  const cells = new Array(256).fill(0); let color = 1, drawing = false;
+  const TPL = [
+    "0000000000000000","0000011111100000","0000111111110000","0000199999910000","0001999999991000","0001912992191000",
+    "0001999999991000","0000199339910000","0000011111100000","0000337777330000","0003377777733000","0009077777709000",
+    "0000077777700000","0000011001100000","0000011001100000","0000111001110000"].join("");
+  function paint(){
+    g.fillStyle = "#2a6338"; g.fillRect(0,0,320,320);
+    for (let i=0;i<256;i++){ const k = cells[i], x = (i%16)*20, y = Math.floor(i/16)*20;
+      if (k){ g.fillStyle = FAN_PAL[k]; g.fillRect(x,y,20,20); }
+      else { g.fillStyle = (Math.floor(i/16)+i)%2 ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.05)"; g.fillRect(x,y,20,20); } }
+  }
+  const pal = document.getElementById("pal");
+  FAN_PAL.forEach((c,k) => {
+    const b = document.createElement("button"); b.type = "button";
+    b.style.background = c || "repeating-linear-gradient(45deg,#2a6338 0 6px,#3d8049 6px 12px)";
+    b.setAttribute("aria-label", k ? "Цвет "+k : "Ластик"); b.setAttribute("aria-pressed", String(k===color));
+    if (!k) b.textContent = "✕";
+    b.style.color = "#fff"; b.style.fontFamily = "var(--px)"; b.style.fontSize = "10px";
+    b.addEventListener("click", () => { color = k; pal.querySelectorAll("button").forEach((o,j) => o.setAttribute("aria-pressed", String(j===k))); });
+    pal.append(b);
+  });
+  function at(e){ const r = grid.getBoundingClientRect(); const cx = Math.floor((e.clientX-r.left)/r.width*16), cy = Math.floor((e.clientY-r.top)/r.height*16);
+    if (cx>=0 && cx<16 && cy>=0 && cy<16){ cells[cy*16+cx] = color; paint(); } }
+  grid.addEventListener("pointerdown", e => { e.preventDefault(); drawing = true; try { grid.setPointerCapture(e.pointerId); } catch(_) {} at(e); });
+  grid.addEventListener("pointermove", e => { if (drawing) at(e); });
+  ["pointerup","pointercancel"].forEach(ev => grid.addEventListener(ev, () => drawing = false));
+  const ed = document.getElementById("editor"), openBtn = document.getElementById("drawOpen"), note = document.getElementById("fanNote");
+  openBtn.addEventListener("click", () => { ed.hidden = false; openBtn.hidden = true; note.textContent = ""; paint(); });
+  document.getElementById("cancelBtn").addEventListener("click", () => { ed.hidden = true; openBtn.hidden = false; });
+  document.getElementById("clrBtn").addEventListener("click", () => { cells.fill(0); paint(); });
+  document.getElementById("tplBtn").addEventListener("click", () => { for (let i=0;i<256;i++) cells[i] = +TPL[i]; paint(); });
+  document.getElementById("sendBtn").addEventListener("click", async () => {
+    const px = cells.join("");
+    if (!/[1-9]/.test(px)){ note.textContent = "Сначала нарисуй хоть что-нибудь"; return; }
+    const btn = document.getElementById("sendBtn"); btn.disabled = true; note.textContent = "Ставлю на траву…";
+    let id = "l" + Date.now().toString(36);
+    try {
+      if (FANS_URL){
+        const r = await fetch(FANS_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify({px})});
+        const d = await r.json(); if (!d.ok) throw 0; id = d.id;
+      } else { const l = localFans(); l.push({id, px}); try { localStorage.setItem("prudy-fans", JSON.stringify(l)); } catch(e) {} }
+      setFans([{id, px}]);
+      note.textContent = FANS_URL ? "Готово! Твой зритель стоит на траве у дороги, его видят все." : "Готово! Зритель стоит на траве у дороги.";
+      cells.fill(0); paint(); ed.hidden = true; openBtn.hidden = false;
+      sfx.init(); cheer(2);
+      const f = fans.find(o => o.id===id);
+      if (f && player){ camX = clampCam((f.x+0.5)*T - viewW/2); }
+      document.getElementById("screen").scrollIntoView({behavior:"smooth", block:"center"});
+    } catch(e){ note.textContent = "Не получилось отправить. Проверь интернет и попробуй ещё раз."; }
+    btn.disabled = false;
+  });
+})();
+loadFans(); if (FANS_URL) setInterval(loadFans, 60000);
 
 /* ================= запуск ================= */
 drawCrew();
