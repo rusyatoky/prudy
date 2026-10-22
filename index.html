@@ -119,7 +119,7 @@ ol.top li.empty{display:block;color:var(--dim);font-family:var(--body);font-size
 <script>
 (() => {
 /* ================= карта района ================= */
-const MAZE = ["~~~~~~~~~~~~~TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT", "~~~~~~~~......o................................oT", "~TTTTTTT.TTTT.TTTT.TTTT.TTTT.TTTT.TTTT.TTTT.TTT.T", "TTTTTTTT.TTTT.TTTT.TTTT.TTTT.TTTT.TTTT.TTTT.TTT.T", "TTTTTTT.........................................T", "SSSSSSS.SSSSSSSSS.SSSSSSSSSSSSSSSSSSSSS.SSS.SSSSS", "T...............................................T", "#.....bbb......ccccc.eeeeee.kk.k.kk.iii.kk.k.kk.#", "#.aaa.bbb..ddd.c...c.ee..ee.k.....k.iii.k..o..k.#", "#.aaa.bbb..dgd.c...c........k.....k.....k.xxx.k.#", "#.aaa......dgd.c...c.ssssss....o....nnn...xxx...#", "#.aaa..bbb.dgd.c.....ssssss.k.....k.nnn.k.....m.#", "#.aaa..bbb.dgd.c.....ssssss.k.....k.nnn.k.....m.#", "#......bbb.d=d.c.....ssssss.kk.k.kk.nnn.kk.k.mm.#", "#....o.........................................o#", "#.wwwwwwwwwwww.wwwwwwwwwwww.wwwwwwwwwww.wwwwwww.#", "#.wwwwwwwwwwww.wwwwwwwwwwww.wwwwwwwwwww.wwwwwww.#", "#.wwwwwwwwwwww.wwwwwwwwwwww.wwwwwwwwwww.wwwwwww.#", ".................................................", "#LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL#", "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"];
+const MAZE = ["~~~~~~~~~~~~~TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT", "~~~~~~~~......o................................oT", "~TTTTTTT.TTTT.TTTT.TTTT.TTTT.TTTT.TTTT.TTTT.TTT.T", "TTTTTTTT.TTTT.TTTT.TTTT.TTTT.TTTT.TTTT.TTTT.TTT.T", "TTTTTTT.........................................T", "SSSSSSS.SSSSSSSSS.SSSSSSSSSSSSSSSSSSSSS.SSS.SSSSS", "T...............................................T", "#.....bbb......ccccc.eeeeee.u.....v.iii.kk.k.kk.#", "#.aaa.bbb..ddd.c...c.ee..ee.u..uu...iii.k..o..k.#", "#.aaa.bbb..dgd.c...c....................k.xxx.k.#", "#.aaa......dgd.c...c.ssssss....pp...nnn...xxx...#", "#.aaa..bbb.dgd.c.....ssssss.k..pp.k.nnn.k.....m.#", "#.aaa..bbb.dgd.c.....ssssss.k....ok.nnn.k.....m.#", "#......bbb.d=d.c.....ssssss.kk.k.kk.nnn.kk.k.mm.#", "#....o.........................................o#", "#.wwwwwwwwwwww.wwwwwwwwwwww.wwwwwwwwwww.wwwwwww.#", "#.wwwwwwwwwwww.wwwwwwwwwwww.wwwwwwwwwww.wwwwwww.#", "#.wwwwwwwwwwww.wwwwwwwwwwww.wwwwwwwwwww.wwwwwww.#", ".................................................", "#LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL#", "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"];
 const W = MAZE[0].length, H = MAZE.length;
 const DOOR = {x:12, y:13}, HOUSE_Y = 11, EXIT = {x:12, y:14}, START = {x:44, y:11};
 const COURTS = [[16,8,18,12],[29,8,33,12],[41,8,45,12]], CROSS = [1,14,27,39,47];
@@ -128,7 +128,7 @@ const inCourt = (x,y) => COURTS.some(c => x>=c[0]&&x<=c[2]&&y>=c[1]&&y<=c[3]);
 /* стили домов по фоткам района */
 const STYLE = {
   a:"garage", b:"cream", c:"mix", e:"panel", s:"school", f:"lcd", h:"lcd2",
-  i:"white", n:"school2", k:"brick", m:"home", q:"cafe", d:"shop"
+  i:"white", n:"school2", u:"gray", v:"brown", k:"brick", m:"home", q:"cafe", d:"shop"
 };
 const LABELS = [
   {t:"5к1", x:7, y:8, w:3}, {t:"5к1", x:8, y:12, w:3},
@@ -193,6 +193,7 @@ function drawCrew(){
     drawGhost(x, g, 24, 22, 46, 0, 1, "out", 0);
     g.card = x;
     const b = document.createElement("b"); b.textContent = g.name;
+    if (g.name==="Максим") b.style.fontFamily = "var(--body)";
     const s = document.createElement("small"); s.textContent = g.role;
     d.append(c,b,s); box.append(d);
   });
@@ -258,6 +259,26 @@ function drawWall(b,x,y,ch){
     drawLexus(b, X, Y, w*T, h*T);
     return;
   }
+  if (ch==="p"){
+    /* детская площадка с качелями и горкой */
+    if (tile(x-1,y)==="p" || tile(x,y-1)==="p") return;
+    let w = 0, h = 0; while (tile(x+w,y)==="p") w++; while (tile(x,y+h)==="p") h++;
+    const PW = w*T, PH = h*T;
+    px(b,X,Y,PW,PH,"#2f7a46"); px(b,X+u,Y+u,PW-2*u,PH-2*u,"#c2573e");
+    for (let i=0;i<6;i++) px(b,X+u*2+rnd(x,i,1)*(PW-5*u),Y+u*2+rnd(i,y,2)*(PH-5*u),u*1.2,u*1.2,"#d97a5c");
+    /* качели: две стойки, перекладина, два сиденья на цепях */
+    const sx = X+u*2.5, sw = PW*0.55, top = Y+u*3;
+    px(b,sx,top,u*1.2,PH*0.62,"#3b6fd6"); px(b,sx+sw,top,u*1.2,PH*0.62,"#3b6fd6");
+    px(b,sx,top,sw+u*1.2,u*1.2,"#5b8ff0");
+    for (const k of [0.3,0.7]){ const cx = sx+sw*k; px(b,cx,top+u,u*0.5,PH*0.32,"#c9cdd9"); px(b,cx+u*1.6,top+u,u*0.5,PH*0.32,"#c9cdd9"); px(b,cx-u*0.4,top+u+PH*0.32,u*2.8,u*0.9,"#ffd166"); }
+    /* горка */
+    const gx = X+PW*0.7, gy = Y+PH*0.45;
+    px(b,gx,gy,u*1.2,PH*0.42,"#e6e9f2");
+    b.fillStyle = "#ffcf3a"; b.beginPath(); b.moveTo(gx+u*1.2,gy); b.lineTo(X+PW-u*1.5,Y+PH-u*2.5); b.lineTo(X+PW-u*3,Y+PH-u*2.5); b.lineTo(gx+u*1.2,gy+u*2); b.fill();
+    /* песочница */
+    px(b,X+u*2.5,Y+PH*0.72,PW*0.38,PH*0.18,"#7a4b2a"); px(b,X+u*3.3,Y+PH*0.72+u*0.8,PW*0.38-u*1.6,PH*0.18-u*1.6,"#e8cf8f");
+    return;
+  }
   if (ch==="S"){
     /* травяной обрыв: парк ниже улицы */
     const gr = b.createLinearGradient(0,Y,0,Y+T);
@@ -314,6 +335,8 @@ function drawWall(b,x,y,ch){
     cream:["#e7cf93","#c7aa6a","#43506f","#b99a58"],
     mix:["#eef0f4","#c4473a","#4a5a80","#c4cad8"],
     white:["#eef0f4","#cfd5e2","#5f78a6","#c4cad8"],
+    gray:["#9ea4b4","#7c8294","#3c4560","#868c9e"],
+    brown:["#8a5a3c","#6e452d","#2e2a3a","#734a31"],
     panel:["#d5dbe8","#8da0c4","#3c4c74","#aab4cc"],
     lcd:["#eef0f5","#e1779a","#6f8bb4","#c9ced9"],
     lcd2:["#e6c69c","#f6f1e7","#6f8bb4","#c3a37a"],
@@ -340,7 +363,7 @@ function drawWall(b,x,y,ch){
       px(b,X+T*0.38,fy+u*0.8,T*0.24,u*1.2,"#9db3d6");
       px(b,X+T*0.35,fy+T/3-u*0.5,T*0.3,u*0.5,"#c9c2b5");
     }
-  } else if (st==="cream"||st==="white"){
+  } else if (st==="cream"||st==="white"||st==="gray"||st==="brown"){
     for (let f=0;f<3;f++) for (let k=0;k<3;k++)
       px(b,X+u*(0.8+k*3.2),Y+f*T/3+u*0.9,u*1.8,u*1.5, rnd(x*3+k,y*3+f,1)>0.65 ? "#ffd977" : pal[2]);
     if (left) px(b,X,Y,u,T,pal[3]); if (right) px(b,X+T-u,Y,u,T,pal[3]);
@@ -469,6 +492,9 @@ function drawShawarma(x,y){
   ctx.fillStyle="#fff7e0"; ctx.fillRect(3*s,-2*s,s,4*s);
   ctx.restore();
 }
+
+/* у пиксельного шрифта «Максим» читается криво — это имя пишем обычным */
+const nameFont = (n, wgt, fs) => n==="Максим" ? `700 ${fs}px "Golos Text", Arial, sans-serif` : `${wgt} ${fs}px "Pixelify Sans", monospace`;
 
 /* ================= размеры и камера ================= */
 function resize(){
@@ -745,7 +771,7 @@ function render(){
   popups.forEach(p => { ctx.font = `700 ${Math.round(T*0.7)}px "Pixelify Sans", monospace`; ctx.fillStyle = "#7df9ff"; ctx.fillText(p.txt,(p.x+0.5)*T,(p.y+0.5-(1-p.life))*T); });
   if (bubble && ghosts.includes(bubble.g)){
     const g = bubble.g, fs = Math.max(11, Math.round(T*0.68));
-    ctx.font = `600 ${fs}px "Pixelify Sans", monospace`;
+    ctx.font = nameFont(bubble.txt, 600, fs);
     const tw = ctx.measureText(bubble.txt).width + 12 + (bubble.voice ? fs*1.6 : 0);
     let bx = (g.x+0.5)*T, by = (g.y-1.05)*T;
     bx = Math.max(cx0+tw/2+2, Math.min(cx0+viewW-tw/2-2, bx)); by = Math.max(fs, by);
@@ -778,7 +804,7 @@ function render(){
   /* кто говорит сейчас */
   if (bubble && bubble.voice && state!=="idle"){
     const g = bubble.g, fs = Math.max(12, Math.round(T*0.7)), hs = fs*2.2;
-    ctx.font = `700 ${fs}px "Pixelify Sans", monospace`;
+    ctx.font = nameFont(g.g.name, 700, fs);
     const tw = ctx.measureText(g.g.name).width, w = hs + tw + fs*2.6, x0 = (viewW - w)/2, y0 = 6;
     ctx.fillStyle = "rgba(8,12,26,.88)"; ctx.fillRect(x0, y0, w, hs+6);
     ctx.fillStyle = g.g.color; ctx.fillRect(x0, y0+hs+3, w, 3);
