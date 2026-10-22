@@ -895,6 +895,7 @@ function render(){
 
 /* ================= старт / конец ================= */
 function newGame(){
+  if (FANS_URL) loadFans();
   setTimeout(() => cheer(1.8), 150);
   introShows++; try { localStorage.setItem("prudy-fanintro", introShows); } catch(e) {}
   score = 0; lives = 3; level = 1; addScore(0); updateLives(); swiped = false;
@@ -1132,9 +1133,35 @@ function setFans(list){
   document.getElementById("fansCount").textContent = fans.length;
 }
 function localFans(){ try { return JSON.parse(localStorage.getItem("prudy-fans")||"[]"); } catch(e){ return []; } }
+/* запоминаем последних загруженных зрителей и неотправленных — чтобы с VPN и без всё было на месте */
+const okFan = f => f && typeof f.id==="string" && /^[0-9]{256}$/.test(f.px||"");
+function cacheGet(k){ try { return JSON.parse(localStorage.getItem(k)||"[]"); } catch(e){ return []; } }
+function cacheSet(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
+async function fetchJSON(url, opts, tries=3){
+  for (let i=0;i<tries;i++){
+    try { const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+      const r = await fetch(url, {...opts, signal: ctl.signal}); clearTimeout(tm); return await r.json(); }
+    catch(e){ if (i===tries-1) throw e; await new Promise(r => setTimeout(r, 1500*(i+1))); }
+  }
+}
+async function flushPending(){
+  const q = cacheGet("prudy-fans-pending"); if (!q.length) return;
+  const left = [];
+  for (const f of q){
+    try { const d = await fetchJSON(FANS_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify({px:f.px})}, 1); if (!d.ok) left.push(f); }
+    catch(e){ left.push(f); }
+  }
+  cacheSet("prudy-fans-pending", left);
+}
 async function loadFans(){
   if (!FANS_URL){ setFans(localFans()); return; }
-  try { const r = await fetch(FANS_URL + "?t=" + Date.now(), {cache:"no-store"}); const l = await r.json(); if (Array.isArray(l)) setFans(l.filter(f => /^[0-9]{256}$/.test(f.px))); } catch(e) {}
+  setFans(cacheGet("prudy-fans-cache").filter(okFan));
+  setFans(cacheGet("prudy-fans-pending").filter(okFan));
+  try {
+    await flushPending();
+    const l = await fetchJSON(FANS_URL + "?t=" + Date.now(), {cache:"no-store"});
+    if (Array.isArray(l)){ const good = l.filter(okFan); cacheSet("prudy-fans-cache", good); setFans(good); }
+  } catch(e) {}
 }
 function cheer(sec=1.6){ cheerT = Math.max(cheerT, sec); if (fans.length) sfx.applause(Math.min(1, 0.3 + fans.length*0.05)); }
 function stepFans(dt){
@@ -1210,8 +1237,13 @@ let introShows = 0; try { introShows = +localStorage.getItem("prudy-fanintro") |
     let id = "l" + Date.now().toString(36);
     try {
       if (FANS_URL){
-        const r = await fetch(FANS_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify({px})});
-        const d = await r.json(); if (!d.ok) throw 0; id = d.id;
+        try {
+          const d = await fetchJSON(FANS_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify({px})}, 2);
+          if (!d.ok) throw 0; id = d.id;
+        } catch(err){
+          /* нет связи с таблицей — запомним и отправим сами, когда связь появится */
+          const q = cacheGet("prudy-fans-pending"); q.push({id, px}); cacheSet("prudy-fans-pending", q);
+        }
       } else { const l = localFans(); l.push({id, px}); try { localStorage.setItem("prudy-fans", JSON.stringify(l)); } catch(e) {} }
       setFans([{id, px}]);
       note.textContent = FANS_URL ? "Готово! Твой зритель стоит на траве у дороги, его видят все." : "Готово! Зритель стоит на траве у дороги.";
@@ -1224,7 +1256,7 @@ let introShows = 0; try { introShows = +localStorage.getItem("prudy-fanintro") |
     btn.disabled = false;
   });
 })();
-loadFans(); if (FANS_URL) setInterval(loadFans, 60000);
+loadFans(); if (FANS_URL){ setInterval(loadFans, 45000); addEventListener("online", loadFans); document.addEventListener("visibilitychange", () => { if (!document.hidden) loadFans(); }); }
 
 /* ================= запуск ================= */
 drawCrew();
